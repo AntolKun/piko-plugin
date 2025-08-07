@@ -35,6 +35,7 @@ class WP_License_Manager
         add_action('wp_ajax_scrape_url', array($this, 'scrape_url'));
         add_action('wp_ajax_get_scraped_page', array($this, 'get_scraped_page'));
         add_action('wp_ajax_track_click', array($this, 'track_click'));
+        add_action('wp_ajax_delete_scraped_page', array($this, 'delete_scraped_page'));
 
         // Add rewrite rule for scraped pages
         add_action('init', array($this, 'add_rewrite_rules'));
@@ -237,56 +238,75 @@ class WP_License_Manager
 
         $licenses = $wpdb->get_results("SELECT * FROM $this->table_name ORDER BY created_at DESC");
 
-        echo '<div class="wrap">';
-        echo '<h1>License Manager</h1>';
+        echo '<div class="wrap lm-full-width">';
+        echo '<h1 class="wp-heading-inline">License Manager</h1>';
+        echo '<hr class="wp-header-end">';
 
-        echo '<div class="card">';
-        echo '<h2>Generate New License</h2>';
-        echo '<form method="post">';
+        // Generate License Form
+        echo '<div class="card lm-card">';
+        echo '<h2 class="title">Generate New License</h2>';
+        echo '<form method="post" class="lm-form">';
         echo '<input type="hidden" name="generate_license" value="1">';
 
-        echo '<table class="form-table">';
-        echo '<tr>';
-        echo '<th scope="row"><label for="customer_name">Customer Name</label></th>';
-        echo '<td><input type="text" name="customer_name" id="customer_name" class="regular-text" required></td>';
-        echo '</tr>';
+        echo '<div class="lm-form-row">';
+        echo '<label for="customer_name">Customer Name</label>';
+        echo '<input type="text" name="customer_name" id="customer_name" class="regular-text" required>';
+        echo '</div>';
 
-        echo '<tr>';
-        echo '<th scope="row"><label for="customer_phone">Phone Number</label></th>';
-        echo '<td><input type="text" name="customer_phone" id="customer_phone" class="regular-text" required></td>';
-        echo '</tr>';
-        echo '</table>';
+        echo '<div class="lm-form-row">';
+        echo '<label for="customer_phone">Phone Number</label>';
+        echo '<input type="text" name="customer_phone" id="customer_phone" class="regular-text" required>';
+        echo '</div>';
 
-        echo '<p class="submit">';
+        echo '<div class="lm-form-submit">';
         echo '<input type="submit" class="button button-primary" value="Generate License Key">';
-        echo '</p>';
+        echo '</div>';
         echo '</form>';
         echo '</div>';
 
-        echo '<div class="card">';
-        echo '<h2>Existing Licenses</h2>';
-        echo '<table class="wp-list-table widefat fixed striped">';
-        echo '<thead><tr><th>ID</th><th>License Key</th><th>Customer Name</th><th>Phone</th><th>Status</th><th>Created At</th><th>Actions</th></tr></thead>';
-        echo '<tbody>';
+        // Existing Licenses Table
+        echo '<div class="card lm-card">';
+        echo '<h2 class="title">Existing Licenses</h2>';
 
-        foreach ($licenses as $license) {
+        if (empty($licenses)) {
+            echo '<p>No licenses found.</p>';
+        } else {
+            echo '<div class="table-responsive">';
+            echo '<table class="wp-list-table widefat fixed striped">';
+            echo '<thead>';
             echo '<tr>';
-            echo '<td>' . $license->id . '</td>';
-            echo '<td>' . $license->license_key . '</td>';
-            echo '<td>' . esc_html($license->customer_name) . '</td>';
-            echo '<td>' . esc_html($license->customer_phone) . '</td>';
-            echo '<td>' . ucfirst($license->status) . '</td>';
-            echo '<td>' . $license->created_at . '</td>';
-            echo '<td>';
-            echo '<button class="button delete-license" data-id="' . $license->id . '">Delete</button>';
-            echo '</td>';
+            echo '<th width="5%">ID</th>';
+            echo '<th width="20%">License Key</th>';
+            echo '<th width="20%">Customer Name</th>';
+            echo '<th width="15%">Phone</th>';
+            echo '<th width="10%">Status</th>';
+            echo '<th width="15%">Created At</th>';
+            echo '<th width="15%">Actions</th>';
             echo '</tr>';
+            echo '</thead>';
+            echo '<tbody>';
+
+            foreach ($licenses as $license) {
+                echo '<tr>';
+                echo '<td>' . $license->id . '</td>';
+                echo '<td><code>' . $license->license_key . '</code></td>';
+                echo '<td>' . esc_html($license->customer_name) . '</td>';
+                echo '<td>' . esc_html($license->customer_phone) . '</td>';
+                echo '<td><span class="lm-status lm-status-' . esc_attr($license->status) . '">' . ucfirst($license->status) . '</span></td>';
+                echo '<td>' . date('M j, Y H:i', strtotime($license->created_at)) . '</td>';
+                echo '<td>';
+                echo '<button class="button button-small delete-license" data-id="' . $license->id . '">Delete</button>';
+                echo '</td>';
+                echo '</tr>';
+            }
+
+            echo '</tbody>';
+            echo '</table>';
+            echo '</div>'; // .table-responsive
         }
 
-        echo '</tbody>';
-        echo '</table>';
-        echo '</div>';
-        echo '</div>';
+        echo '</div>'; // .card
+        echo '</div>'; // .wrap
 
         $this->admin_scripts();
     }
@@ -299,92 +319,151 @@ class WP_License_Manager
 
         global $wpdb;
 
-        echo '<div class="wrap">';
-        echo '<h1>SERP Scraping Tool</h1>';
+        echo '<div class="wrap lm-full-width">';
+        echo '<h1 class="wp-heading-inline">SERP Scraping Tool</h1>';
+        echo '<a href="' . admin_url('admin.php?page=license-manager') . '" class="page-title-action">Back to License Manager</a>';
+        echo '<hr class="wp-header-end">';
 
-        echo '<div class="card">';
-        echo '<h2>Search and Scrape</h2>';
-        echo '<div id="scraping-tool-container">';
+        // Search and Scrape Tool
+        echo '<div class="card lm-card">';
+        echo '<h2 class="title">Search and Scrape</h2>';
+        echo '<div id="scraping-tool-container" class="lm-scraping-tool" style="max-width:none" >';
 
-        // Step 1: Search form
-        echo '<div id="search-step">';
-        echo '<p><strong>Step 1:</strong> Enter a keyword to search</p>';
-        echo '<input type="text" id="search-keyword" placeholder="Enter keyword" class="regular-text">';
+        // Step 1: Search
+        echo '<div id="search-step" class="lm-step">';
+        echo '<h3><span class="step-number">1</span> Enter Keyword</h3>';
+        echo '<div class="lm-search-box">';
+        echo '<input type="text" id="search-keyword" placeholder="Enter keyword to search" class="regular-text">';
         echo '<button id="search-button" class="button button-primary">Search</button>';
         echo '</div>';
-
-        // Step 2: Results (will be populated via AJAX)
-        echo '<div id="results-step" style="display:none; margin-top:20px;">';
-        echo '<p><strong>Step 2:</strong> Select a result to scrape</p>';
-        echo '<div id="search-results" style="margin: 10px 0;"></div>';
         echo '</div>';
 
-        // Step 3: Scraping options (will be shown after selecting a result)
-        echo '<div id="scraping-step" style="display:none; margin-top:20px;">';
-        echo '<p><strong>Step 3:</strong> Configure scraping options</p>';
-        echo '<div class="form-table">';
+        // Step 2: Results
+        echo '<div id="results-step" class="lm-step" style="display:none;">';
+        echo '<h3><span class="step-number">2</span> Select Search Result</h3>';
+        echo '<div id="search-results" class="lm-search-results"></div>';
+        echo '</div>';
 
-        echo '<div class="form-field">';
-        echo '<label><strong>Available for devices:</strong></label><br>';
-        echo '<label><input type="checkbox" name="device_desktop" value="desktop" checked> Desktop</label> ';
-        echo '<label><input type="checkbox" name="device_mobile" value="mobile" checked> Mobile</label> ';
+        // Step 3: Scraping Options
+        echo '<div id="scraping-step" class="lm-step" style="display:none;">';
+        echo '<h3><span class="step-number">3</span> Configure Scraping Options</h3>';
+        echo '<div class="lm-form-row">';
+        echo '<label><strong>Available for devices:</strong></label>';
+        echo '<div class="lm-checkbox-group">';
+        echo '<label><input type="checkbox" name="device_desktop" value="desktop" checked> Desktop</label>';
+        echo '<label><input type="checkbox" name="device_mobile" value="mobile" checked> Mobile</label>';
         echo '<label><input type="checkbox" name="device_tablet" value="tablet" checked> Tablet</label>';
         echo '</div>';
-
+        echo '</div>';
         echo '<button id="scrape-button" class="button button-primary">Scrape URL</button>';
         echo '</div>';
+
+        // Step 4: Preview
+        echo '<div id="preview-step" class="lm-step" style="display:none;">';
+        echo '<h3><span class="step-number">4</span> Preview & Stats</h3>';
+        echo '<div id="preview-container" class="lm-preview-container"></div>';
+        echo '<div id="stats-container" class="lm-stats-container"></div>';
         echo '</div>';
+        echo '</div>'; // #scraping-tool-container
+        echo '</div>'; // .card
 
-        // Step 4: Preview and stats (will be shown after scraping)
-        echo '<div id="preview-step" style="display:none; margin-top:20px;">';
-        echo '<p><strong>Step 4:</strong> Preview and stats</p>';
-        echo '<div id="preview-container"></div>';
-        echo '<div id="stats-container" style="margin-top:20px;"></div>';
-        echo '</div>';
-
-        echo '</div>'; // end #scraping-tool-container
-        echo '</div>'; // end .card
-
-        // List of previously scraped pages
+        // Previously Scraped Pages
         $scraped_pages = $wpdb->get_results("
-            SELECT s.*, l.license_key 
-            FROM $this->scraping_table s
-            LEFT JOIN $this->table_name l ON s.license_id = l.id
-            ORDER BY s.created_at DESC
-        ");
+        SELECT s.*, l.license_key 
+        FROM $this->scraping_table s
+        LEFT JOIN $this->table_name l ON s.license_id = l.id
+        ORDER BY s.created_at DESC
+    ");
 
-        if ($scraped_pages) {
-            echo '<div class="card">';
-            echo '<h2>Previously Scraped Pages</h2>';
-            echo '<table class="wp-list-table widefat fixed striped">';
-            echo '<thead><tr><th>ID</th><th>Keyword</th><th>Title</th><th>URL</th><th>Devices</th><th>Views</th><th>Clicks</th><th>License</th><th>Actions</th></tr></thead>';
+        echo '<div class="card lm-card">';
+        echo '<h2 class="title">Previously Scraped Pages</h2>';
+
+        if (empty($scraped_pages)) {
+            echo '<p>No scraped pages found.</p>';
+        } else {
+            echo '<div class="table-responsive">';
+            echo '<table class="wp-list-table widefat fixed striped lm-scraped-table" style="width:100%">';
+            echo '<thead>';
+            echo '<tr>';
+            echo '<th class="column-id">ID</th>';
+            echo '<th class="column-keyword">Keyword</th>';
+            echo '<th class="column-title">Title</th>';
+            echo '<th class="column-url">URL</th>';
+            echo '<th class="column-devices">Devices</th>';
+            echo '<th class="column-stats">Stats</th>';
+            echo '<th class="column-license">License</th>';
+            echo '<th class="column-actions">Actions</th>';
+            echo '</tr>';
+            echo '</thead>';
             echo '<tbody>';
 
             foreach ($scraped_pages as $page) {
                 echo '<tr>';
-                echo '<td>' . $page->id . '</td>';
-                echo '<td>' . esc_html($page->keyword) . '</td>';
-                echo '<td>' . esc_html($page->title) . '</td>';
-                echo '<td>' . esc_html($page->url) . '</td>';
-                echo '<td>' . esc_html($page->devices) . '</td>';
-                echo '<td>' . $page->views . '</td>';
-                echo '<td>' . $page->clicks . '</td>';
-                echo '<td>' . ($page->license_key ? esc_html($page->license_key) : 'Admin') . '</td>';
-                echo '<td>';
-                echo '<button class="button preview-scraped-page" data-id="' . $page->id . '">Preview</button>';
-                echo '<button class="button delete-scraped-page" data-id="' . $page->id . '">Delete</button>';
+                echo '<td class="column-id">' . $page->id . '</td>';
+                echo '<td class="column-keyword">' . esc_html($page->keyword) . '</td>';
+                echo '<td class="column-title">' . esc_html($this->truncate_text($page->title, 30)) . '</td>';
+                echo '<td class="column-url"><a href="' . esc_url($page->url) . '" target="_blank" title="' . esc_attr($page->url) . '">' . esc_html($this->truncate_url($page->url)) . '</a></td>';
+                echo '<td class="column-devices">' . $this->format_devices($page->devices) . '</td>';
+                echo '<td class="column-stats">';
+                echo '<span class="stat-box"><span class="dashicons dashicons-visibility"></span> ' . $page->views . '</span>';
+                echo '<span class="stat-box"><span class="dashicons dashicons-external"></span> ' . $page->clicks . '</span>';
+                echo '</td>';
+                echo '<td class="column-license">' . ($page->license_key ? esc_html($this->truncate_text($page->license_key, 8)) : 'Admin') . '</td>';
+                echo '<td class="column-actions">';
+                echo '<div class="lm-action-buttons">';
+                echo '<button class="button button-small preview-scraped-page" data-id="' . $page->id . '" title="Preview"><span class="dashicons dashicons-welcome-view-site"></span></button>';
+                echo '<button class="button button-small delete-scraped-page" data-id="' . $page->id . '" title="Delete"><span class="dashicons dashicons-trash"></span></button>';
+                echo '</div>';
                 echo '</td>';
                 echo '</tr>';
             }
 
             echo '</tbody>';
             echo '</table>';
-            echo '</div>';
+            echo '</div>'; // .table-responsive
         }
 
-        echo '</div>'; // end .wrap
+        echo '</div>'; // .card
+        echo '</div>'; // .wrap
 
         $this->scraping_tool_scripts();
+    }
+
+    private function truncate_text($text, $length = 30)
+    {
+        if (mb_strlen($text) <= $length) {
+            return $text;
+        }
+        return mb_substr($text, 0, $length) . '...';
+    }
+
+    private function truncate_url($url, $length = 25)
+    {
+        $url = str_replace(['https://', 'http://'], '', $url);
+        if (mb_strlen($url) <= $length) {
+            return $url;
+        }
+        return mb_substr($url, 0, $length) . '...';
+    }
+
+    private function format_devices($devices)
+    {
+        $device_map = [
+            'desktop' => '<span class="dashicons dashicons-desktop"></span>',
+            'mobile' => '<span class="dashicons dashicons-smartphone"></span>',
+            'tablet' => '<span class="dashicons dashicons-tablet"></span>'
+        ];
+
+        $output = [];
+        $devices = explode(',', $devices);
+
+        foreach ($device_map as $key => $icon) {
+            if (in_array($key, $devices)) {
+                $output[] = $icon;
+            }
+        }
+
+        return implode(' ', $output);
     }
 
     public function serp_search()
@@ -695,9 +774,254 @@ class WP_License_Manager
         }
     }
 
+    public function delete_scraped_page()
+    {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Unauthorized');
+        }
+
+        $page_id = isset($_POST['page_id']) ? intval($_POST['page_id']) : 0;
+
+        global $wpdb;
+        $deleted = $wpdb->delete(
+            $this->scraping_table,
+            array('id' => $page_id),
+            array('%d')
+        );
+
+        if ($deleted) {
+            wp_send_json_success('Scraped page deleted successfully');
+        } else {
+            wp_send_json_error('Failed to delete scraped page');
+        }
+    }
+
     private function admin_scripts()
     {
     ?>
+        <style>
+            /* Full Width Layout */
+            .lm-full-width {
+                max-width: none !important;
+                padding: 20px;
+                margin: 0;
+                width: calc(100% - 40px);
+            }
+
+            .lm-full-width .lm-card {
+                margin: 0 0 20px 0;
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            /* Header Adjustments */
+            .lm-full-width .wp-heading-inline {
+                margin-right: 15px;
+            }
+
+            .lm-full-width .page-title-action {
+                margin-top: 3px;
+            }
+
+            /* Table Improvements */
+            .lm-full-width .table-responsive {
+                width: 100%;
+                overflow-x: auto;
+            }
+
+            .lm-full-width .wp-list-table {
+                width: 100%;
+                table-layout: auto;
+            }
+
+            /* Card Layout */
+            .lm-card {
+                background: #fff;
+                border: 1px solid #ccd0d4;
+                box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+
+            /* Column Width Adjustments */
+            .lm-scraped-table .column-id {
+                width: 5%;
+            }
+
+            .lm-scraped-table .column-keyword {
+                width: 15%;
+            }
+
+            .lm-scraped-table .column-title {
+                width: 20%;
+            }
+
+            .lm-scraped-table .column-url {
+                width: 20%;
+            }
+
+            .lm-scraped-table .column-devices {
+                width: 10%;
+            }
+
+            .lm-scraped-table .column-stats {
+                width: 10%;
+            }
+
+            .lm-scraped-table .column-license {
+                width: 10%;
+            }
+
+            .lm-scraped-table .column-actions {
+                width: 10%;
+            }
+
+            /* Responsive Adjustments */
+            @media screen and (max-width: 1600px) {
+                .lm-scraped-table .column-url {
+                    width: 15%;
+                }
+            }
+
+            @media screen and (max-width: 1200px) {
+                .lm-scraped-table .column-url {
+                    display: table-cell;
+                }
+            }
+        </style>
+        <style>
+            /* General Styles */
+            .lm-container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            .lm-card {
+                margin-bottom: 20px;
+                padding: 20px;
+                background: #fff;
+                box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+                border: 1px solid #ccd0d4;
+            }
+
+            .lm-card .title {
+                margin-top: 0;
+                padding-bottom: 10px;
+                border-bottom: 1px solid #eee;
+            }
+
+            /* Form Styles */
+            .lm-form-row {
+                margin-bottom: 15px;
+            }
+
+            .lm-form-row label {
+                display: block;
+                margin-bottom: 5px;
+                font-weight: 600;
+            }
+
+            .lm-form-submit {
+                margin-top: 20px;
+            }
+
+            /* Status Badges */
+            .lm-status {
+                display: inline-block;
+                padding: 3px 8px;
+                border-radius: 3px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+
+            .lm-status-active {
+                background: #e6f4ea;
+                color: #1d7b30;
+            }
+
+            .lm-status-inactive {
+                background: #f5e8e8;
+                color: #d63638;
+            }
+
+            /* Scraping Tool Styles */
+            .lm-scraping-tool {
+                max-width: 800px;
+            }
+
+            .lm-step {
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 1px dashed #ddd;
+            }
+
+            .lm-step h3 {
+                margin: 0 0 15px 0;
+                display: flex;
+                align-items: center;
+            }
+
+            .step-number {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 24px;
+                height: 24px;
+                background: #2271b1;
+                color: white;
+                border-radius: 50%;
+                margin-right: 10px;
+                font-size: 14px;
+            }
+
+            .lm-search-box {
+                display: flex;
+                gap: 10px;
+            }
+
+            .lm-search-box input {
+                flex: 1;
+            }
+
+            .lm-search-results {
+                max-height: 400px;
+                overflow-y: auto;
+                border: 1px solid #ddd;
+                padding: 10px;
+                background: #f9f9f9;
+            }
+
+            .lm-checkbox-group {
+                display: flex;
+                gap: 15px;
+                margin-top: 5px;
+            }
+
+            .lm-preview-container {
+                border: 1px solid #ddd;
+                padding: 15px;
+                background: #f9f9f9;
+            }
+
+            .lm-stats-container {
+                margin-top: 15px;
+                padding: 10px;
+                background: #f5f5f5;
+                border-radius: 3px;
+            }
+
+            /* Responsive Tables */
+            .table-responsive {
+                overflow-x: auto;
+            }
+
+            /* Buttons */
+            .button-small {
+                padding: 0 8px;
+                font-size: 12px;
+                line-height: 26px;
+            }
+        </style>
         <script>
             jQuery(document).ready(function($) {
                 $('.delete-license').on('click', function() {
@@ -743,6 +1067,358 @@ class WP_License_Manager
     private function scraping_tool_scripts()
     {
     ?>
+        <style>
+            /* General Scraping Tool Styles */
+            .lm-scraping-tool {
+                max-width: 800px;
+                margin: 0 auto;
+            }
+
+            /* Step Container */
+            .lm-step {
+                background: #fff;
+                padding: 20px;
+                margin-bottom: 20px;
+                border-radius: 4px;
+                box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+                border: 1px solid #ccd0d4;
+            }
+
+            .lm-step h3 {
+                margin-top: 0;
+                color: #1d2327;
+                display: flex;
+                align-items: center;
+                font-size: 14px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .step-number {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 24px;
+                height: 24px;
+                background: #2271b1;
+                color: white;
+                border-radius: 50%;
+                margin-right: 10px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+
+            /* Search Box */
+            .lm-search-box {
+                display: flex;
+                gap: 10px;
+                margin-top: 15px;
+            }
+
+            .lm-search-box input {
+                flex: 1;
+                padding: 8px 12px;
+                border: 1px solid #8c8f94;
+                border-radius: 3px;
+                min-height: 36px;
+            }
+
+            /* Search Results */
+            .lm-search-results {
+                max-height: 400px;
+                overflow-y: auto;
+                margin-top: 15px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+
+            .search-result-item {
+                padding: 15px;
+                border-bottom: 1px solid #eee;
+                transition: background 0.2s;
+                cursor: pointer;
+            }
+
+            .search-result-item:hover {
+                background-color: #f8f9fa;
+            }
+
+            .search-result-item h4 {
+                margin: 0 0 5px 0;
+                color: #2271b1;
+                font-size: 15px;
+            }
+
+            .search-result-item p {
+                margin: 0;
+                color: #646970;
+                font-size: 13px;
+            }
+
+            .search-result-item .url {
+                color: #0a7c36;
+                font-size: 13px;
+                margin-bottom: 5px;
+            }
+
+            /* Device Options */
+            .lm-checkbox-group {
+                display: flex;
+                gap: 15px;
+                margin: 15px 0;
+            }
+
+            .lm-checkbox-group label {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                cursor: pointer;
+            }
+
+            /* Preview Container */
+            .lm-preview-container {
+                background: #fff;
+                padding: 20px;
+                border: 1px solid #ccd0d4;
+                border-radius: 4px;
+                margin-top: 15px;
+            }
+
+            .lm-preview-container p {
+                margin: 0 0 10px 0;
+                line-height: 1.5;
+            }
+
+            .lm-preview-container iframe {
+                width: 100%;
+                height: 500px;
+                border: 1px solid #ddd;
+                margin-top: 15px;
+                background: #fff;
+            }
+
+            /* Stats Container */
+            .lm-stats-container {
+                background: #f6f7f7;
+                padding: 15px;
+                border-radius: 4px;
+                margin-top: 15px;
+                font-size: 14px;
+            }
+
+            /* Modal Preview */
+            #scraped-page-modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                z-index: 99999;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            #scraped-page-modal>div {
+                background: #fff;
+                padding: 25px;
+                width: 90%;
+                max-width: 1000px;
+                max-height: 90vh;
+                overflow: auto;
+                border-radius: 5px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            }
+
+            #scraped-page-modal h2 {
+                margin-top: 0;
+                color: #1d2327;
+            }
+
+            /* Responsive Adjustments */
+            @media (max-width: 782px) {
+                .lm-search-box {
+                    flex-direction: column;
+                }
+
+                .lm-checkbox-group {
+                    flex-direction: column;
+                    gap: 8px;
+                }
+
+                .lm-preview-container iframe {
+                    height: 300px;
+                }
+
+                .lm-scraped-pages-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 15px;
+                }
+
+                .lm-scraped-pages-table th {
+                    background: #f6f7f7;
+                    text-align: left;
+                    padding: 10px;
+                    border-bottom: 1px solid #ccd0d4;
+                    font-weight: 600;
+                }
+
+                .lm-scraped-pages-table td {
+                    padding: 10px;
+                    border-bottom: 1px solid #eee;
+                    vertical-align: top;
+                }
+
+                .lm-scraped-pages-table tr:hover td {
+                    background-color: #f9f9f9;
+                }
+
+                .lm-scraped-url {
+                    max-width: 200px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    display: inline-block;
+                }
+
+                /* Action Buttons */
+                .lm-action-buttons {
+                    display: flex;
+                    gap: 5px;
+                }
+
+                .lm-action-buttons .button {
+                    padding: 4px 8px;
+                    font-size: 13px;
+                    line-height: 1.5;
+                }
+
+                /* Scraped Pages Table */
+                .lm-scraped-table {
+                    table-layout: fixed;
+                    width: 100%;
+                    margin-top: 15px;
+                }
+
+                .lm-scraped-table th {
+                    font-weight: 600;
+                }
+
+                .lm-scraped-table td,
+                .lm-scraped-table th {
+                    padding: 10px;
+                    vertical-align: middle;
+                    word-wrap: break-word;
+                }
+
+                /* Column Widths */
+                .lm-scraped-table .column-id {
+                    width: 50px;
+                    text-align: center;
+                }
+
+                .lm-scraped-table .column-keyword {
+                    width: 120px;
+                }
+
+                .lm-scraped-table .column-title {
+                    width: 180px;
+                }
+
+                .lm-scraped-table .column-url {
+                    width: 150px;
+                }
+
+                .lm-scraped-table .column-devices {
+                    width: 80px;
+                    text-align: center;
+                }
+
+                .lm-scraped-table .column-stats {
+                    width: 100px;
+                }
+
+                .lm-scraped-table .column-license {
+                    width: 80px;
+                    text-align: center;
+                }
+
+                .lm-scraped-table .column-actions {
+                    width: 80px;
+                    text-align: center;
+                }
+
+                /* Stats Box */
+                .stat-box {
+                    display: inline-flex;
+                    align-items: center;
+                    margin: 0 5px;
+                    font-size: 12px;
+                }
+
+                .stat-box .dashicons {
+                    font-size: 16px;
+                    margin-right: 3px;
+                    color: #646970;
+                }
+
+                /* Action Buttons */
+                .lm-action-buttons {
+                    display: flex;
+                    justify-content: center;
+                    gap: 5px;
+                }
+
+                .lm-action-buttons .button {
+                    padding: 0;
+                    width: 30px;
+                    height: 30px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .lm-action-buttons .button .dashicons {
+                    font-size: 16px;
+                    line-height: 1;
+                }
+
+                /* Device Icons */
+                .column-devices .dashicons {
+                    font-size: 20px;
+                    color: #2271b1;
+                }
+
+                /* Hover Effects */
+                .lm-scraped-table tr:hover td {
+                    background-color: #f8f9fa;
+                }
+
+                /* Responsive Table */
+                @media screen and (max-width: 1200px) {
+
+                    .lm-scraped-table .column-title,
+                    .lm-scraped-table .column-url {
+                        display: none;
+                    }
+                }
+
+                @media screen and (max-width: 782px) {
+                    .lm-scraped-table {
+                        display: block;
+                        overflow-x: auto;
+                        white-space: nowrap;
+                    }
+
+                    .lm-scraped-table .column-stats,
+                    .lm-scraped-table .column-license {
+                        display: none;
+                    }
+                }
+            }
+        </style>
         <script>
             jQuery(document).ready(function($) {
                 // Handle search
@@ -901,6 +1577,7 @@ class WP_License_Manager
                 });
 
                 // Handle preview of previously scraped pages
+                // Ganti kode untuk preview scraped page dengan ini:
                 $('.preview-scraped-page').on('click', function() {
                     var pageId = $(this).data('id');
 
@@ -916,11 +1593,11 @@ class WP_License_Manager
                                 var data = response.data;
 
                                 // Show preview in a modal
-                                var modalHtml = '<div style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:99999; display:flex; justify-content:center; align-items:center;">';
+                                var modalHtml = '<div id="scraped-page-modal" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:99999; display:flex; justify-content:center; align-items:center;">';
                                 modalHtml += '<div style="background:#fff; padding:20px; width:80%; max-width:1000px; max-height:90vh; overflow:auto;">';
                                 modalHtml += '<div style="display:flex; justify-content:space-between; margin-bottom:15px;">';
                                 modalHtml += '<h2 style="margin:0;">Preview: ' + data.title + '</h2>';
-                                modalHtml += '<button class="button" onclick="jQuery(this).closest(\'div[style^=\"position:fixed\"]\').remove();">Close</button>';
+                                modalHtml += '<button id="close-preview-modal" class="button">Close</button>';
                                 modalHtml += '</div>';
 
                                 modalHtml += '<p><strong>Original URL:</strong> <a href="' + data.url + '" target="_blank">' + data.url + '</a></p>';
@@ -930,6 +1607,11 @@ class WP_License_Manager
                                 modalHtml += '</div></div>';
 
                                 $('body').append(modalHtml);
+
+                                // Handle close button
+                                $('#close-preview-modal').on('click', function() {
+                                    $('#scraped-page-modal').remove();
+                                });
 
                                 // Track clicks on the original URL
                                 $('a[href="' + data.url + '"]').on('click', function(e) {
@@ -967,7 +1649,7 @@ class WP_License_Manager
                     var $row = $(this).closest('tr');
 
                     $.ajax({
-                        url: ajaxurl,
+                        url: ajaxurl, // Sudah benar
                         type: 'POST',
                         data: {
                             action: 'delete_scraped_page',
