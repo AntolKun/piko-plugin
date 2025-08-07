@@ -1,0 +1,21 @@
+.serp-results {
+    list-style: none;
+    padding: 0;
+}
+
+.serp-results li {
+    padding: 15px;
+    margin-bottom: 15px;
+    background: #f9f9f9;
+    border-left: 4px solid #2271b1;
+}
+
+.serp-results h4 {
+    margin-top: 0;
+    margin-bottom: 5px;
+}
+
+.serp-results small {
+    color: #666;
+    word-break: break-all;
+}
